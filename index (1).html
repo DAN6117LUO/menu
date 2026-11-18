@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<!-- 旦罗啦的餐馆 · H5 扫码点餐（测试版 v3）
+     用法1（最简单）：把本文件发到手机，用浏览器打开即可点餐（无桌号时默认「家」）
+     用法2（贴桌二维码）：网址后面加 ?table=桌号，如 ...?table=A01 -->
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>旦罗啦的餐馆 · 扫码点餐</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  body { font-family: -apple-system, "PingFang SC", sans-serif; background: #FFF6FA; background-image: radial-gradient(#FFE1EE 1.5px, transparent 1.5px); background-size: 26px 26px; color: #4A3B42; padding-bottom: 130px; }
+  .header { position: relative; background: linear-gradient(135deg, #1F1F1F, #3D3D3D); color: #fff; padding: 44px 20px 28px; border-radius: 0 0 30px 30px; box-shadow: 0 4px 16px rgba(0,0,0,.3); overflow: hidden; }
+  .header h1 { font-size: 24px; }
+  .table-tag { display: inline-block; margin-top: 10px; padding: 5px 16px; background: rgba(255,255,255,.4); border-radius: 20px; font-size: 13px; }
+  .cate-bar { display: flex; gap: 10px; background: #fff; padding: 14px 16px 0; overflow-x: auto; }
+  .cate-item { flex-shrink: 0; padding: 8px 18px; border-radius: 20px; background: #F2F2F2; color: #666; font-size: 14px; }
+  .cate-item.active { background: #FF7A00; color: #fff; }
+  .dish-item { display: flex; align-items: center; justify-content: space-between; background: #fff; margin: 12px 14px; padding: 16px; border-radius: 18px; box-shadow: 0 2px 10px rgba(255,143,181,.12); }
+  .dish-name { font-size: 17px; font-weight: bold; }
+  .dish-emoji { font-size: 26px; margin-right: 10px; }
+  .group-title { display: inline-block; margin: 18px 20px 4px; padding: 6px 22px; background: #FF6B9D; color: #fff; border-radius: 20px; font-size: 15px; font-weight: bold; transform: rotate(-2deg); box-shadow: 0 3px 8px rgba(255,107,157,.3); }
+  .sticker { position: absolute; font-size: 26px; filter: drop-shadow(0 2px 3px rgba(0,0,0,.15)); animation: sway 3s ease-in-out infinite alternate; }
+  @keyframes sway { from { transform: rotate(-8deg); } to { transform: rotate(8deg); } }
+  .float-sticker { position: fixed; bottom: -40px; font-size: 22px; opacity: .5; pointer-events: none; animation: floatup linear infinite; }
+  @keyframes floatup { 0% { transform: translateY(0) rotate(-10deg); opacity: 0; } 10% { opacity: .55; } 90% { opacity: .4; } 100% { transform: translateY(-110vh) rotate(15deg); opacity: 0; } }
+  .dish-desc { font-size: 12px; color: #999; margin: 6px 0; }
+  .price { color: #FF5C9C; font-weight: bold; }
+  .stepper { display: flex; align-items: center; gap: 4px; }
+  .step-btn { width: 30px; height: 30px; line-height: 28px; text-align: center; border: 1px solid #ddd; border-radius: 50%; color: #666; cursor: pointer; user-select: none; }
+  .step-btn.add { background: #FF6B9D; border-color: #FF6B9D; color: #fff; }
+  .step-count { min-width: 28px; text-align: center; font-weight: bold; }
+  .add-btn { background: #FF6B9D; color: #fff; padding: 8px 18px; border-radius: 20px; font-size: 14px; cursor: pointer; }
+  .cart-bar { position: fixed; left: 14px; right: 14px; bottom: 14px; height: 60px; background: #fff; border-radius: 30px; display: flex; align-items: center; padding: 0 8px 0 20px; box-shadow: 0 4px 16px rgba(255,143,181,.3); }
+  .cart-icon { position: relative; font-size: 24px; }
+  .cart-badge { position: absolute; top: -6px; right: -10px; min-width: 18px; height: 18px; line-height: 18px; text-align: center; background: #FF5C9C; color: #fff; border-radius: 9px; font-size: 11px; padding: 0 4px; }
+  .cart-total { flex: 1; margin-left: 14px; font-size: 18px; }
+  .cart-go { background: #FF6B9D; color: #fff; border: none; border-radius: 24px; height: 46px; padding: 0 30px; font-size: 15px; cursor: pointer; }
+  .cart-go:disabled { background: #ddd; }
+  .mask { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.5); z-index: 10; }
+  .sheet { display: none; position: fixed; left: 0; right: 0; bottom: 0; background: #fff; border-radius: 20px 20px 0 0; z-index: 11; padding: 20px 20px calc(20px + env(safe-area-inset-bottom)); max-height: 70vh; overflow-y: auto; }
+  .sheet.open, .mask.open { display: block; }
+  .sheet-title { font-size: 18px; font-weight: bold; text-align: center; margin-bottom: 12px; }
+  .cart-row { display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-bottom: 1px solid #F0F0F0; }
+  .remark-row { margin-top: 16px; display: flex; align-items: center; gap: 10px; }
+  .remark-row input { flex: 1; background: #F6F6F6; border: none; border-radius: 8px; padding: 10px 12px; font-size: 14px; }
+  .total-row { display: flex; justify-content: space-between; align-items: center; margin: 16px 0; font-size: 15px; color: #666; }
+  .total-row .price { font-size: 20px; }
+  .submit { width: 100%; height: 48px; background: #FF6B9D; color: #fff; border: none; border-radius: 24px; font-size: 16px; cursor: pointer; }
+  .order-card { background: #fff; margin: 12px 14px; padding: 16px; border-radius: 18px; box-shadow: 0 2px 10px rgba(255,143,181,.12); }
+  .order-head { display: flex; justify-content: space-between; font-weight: bold; margin-bottom: 10px; }
+  .status { font-size: 12px; padding: 3px 10px; border-radius: 12px; background: #FFE1EE; color: #E0508A; }
+  .order-row { display: flex; justify-content: space-between; color: #666; font-size: 13px; padding: 4px 0; }
+  .order-foot { display: flex; justify-content: space-between; margin-top: 12px; padding-top: 10px; border-top: 1px solid #F0F0F0; color: #999; font-size: 12px; align-items: center; }
+  .tabs { position: fixed; bottom: 0; left: 0; right: 0; display: flex; background: #fff; border-top: 1px solid #eee; }
+  .tabs .tab { flex: 1; text-align: center; padding: 12px 0 16px; color: #999; font-size: 14px; cursor: pointer; }
+  .tabs .tab.active { color: #FF5C9C; font-weight: bold; }
+  .empty { text-align: center; color: #999; padding: 60px 0; font-size: 14px; }
+  .view { display: none; } .view.active { display: block; }
+  .toast { position: fixed; top: 45%; left: 50%; transform: translate(-50%,-50%); background: rgba(0,0,0,.75); color: #fff; padding: 12px 24px; border-radius: 10px; font-size: 14px; z-index: 99; display: none; }
+  .err-bar { background: #FFEBEE; color: #C62828; padding: 12px 16px; font-size: 13px; word-break: break-all; }
+</style>
+</head>
+<body>
+  <div class="float-sticker" style="left:8%; animation-duration:14s;">💌</div>
+  <div class="float-sticker" style="left:36%; animation-duration:19s; animation-delay:5s;">🌸</div>
+  <div class="float-sticker" style="left:64%; animation-duration:16s; animation-delay:9s;">⭐</div>
+  <div class="float-sticker" style="left:88%; animation-duration:21s; animation-delay:2s;">🍩</div>
+  <div class="header">
+    <span class="sticker" style="top:12px;right:18px;">🐰</span><span class="sticker" style="top:34px;right:56px;font-size:18px;">🎀</span><span class="sticker" style="bottom:10px;right:26px;font-size:20px;">🍰</span><h1>💕 旦罗啦的餐馆</h1>
+    <div style="font-size:13px;opacity:.9;margin-top:4px">今天想吃点什么呀？(๑&gt;ᴗ&lt;๑)</div>
+    <div class="table-tag" id="tableTag">桌号：家（默认）</div>
+  </div>
+
+  <!-- 点餐视图 -->
+  <div class="view active" id="menuView">
+    <div class="cate-bar" id="cateBar"></div>
+    <div id="dishList">
+      <!-- 静态兜底：万一程序没跑起来，至少能看到菜品 -->
+      <div class="dish-item"><div><div class="dish-name">🍚 蛋炒饭</div><div class="price">¥20</div></div></div>
+      <div class="dish-item"><div><div class="dish-name">🍅 西红柿炒鸡蛋</div><div class="price">¥20</div></div></div>
+      <div class="dish-item"><div><div class="dish-name">😘 旦式亲亲</div><div class="price">¥520</div></div></div>
+      <div class="empty">如果看不到“加菜”按钮，请用手机浏览器打开本页面，不要在微信里直接预览文件。</div>
+    </div>
+    <div class="cart-bar">
+      <div class="cart-icon">🐰<span class="cart-badge" id="cartBadge" style="display:none">0</span></div>
+      <div class="cart-total price" id="cartTotal">¥0</div>
+      <button class="cart-go" id="cartGo" onclick="openCart()" disabled>点好啦，去下单 ♡</button>
+    </div>
+  </div>
+
+  <!-- 订单视图 -->
+  <div class="view" id="orderView">
+    <div id="orderList"></div>
+  </div>
+
+  <div class="tabs">
+    <div class="tab active" onclick="switchView('menuView', this)">🍚 点餐</div>
+    <div class="tab" onclick="switchView('orderView', this)">🧾 订单</div>
+  </div>
+
+  <!-- 购物车弹层 -->
+  <div class="mask" id="mask" onclick="closeCart()"></div>
+  <div class="sheet" id="cartSheet">
+    <div class="sheet-title">🧺 购物车</div>
+    <div id="cartRows"></div>
+    <div class="remark-row">备注：<input id="remarkInput" placeholder="想对老板说的话（可选）"></div>
+    <div class="total-row"><span id="totalCount"></span><span>合计：<span class="price" id="sheetTotal"></span></span></div>
+    <button class="submit" onclick="submitOrder()">提交订单 ♡（测试模式，不收钱）</button>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+<script>
+// ========== 出错时把原因显示在页面顶部（方便排查，正式版可去掉）==========
+window.onerror = function (msg, url, line) {
+  var bar = document.createElement('div')
+  bar.className = 'err-bar'
+  bar.textContent = '页面出错：' + msg + '（第 ' + line + ' 行）'
+  document.body.insertBefore(bar, document.body.firstChild)
+}
+
+// ========== 本地存储的安全封装 ==========
+// 部分手机浏览器直接打开本地文件时会禁止 localStorage，做兜底防止整个页面崩掉
+var memStore = {}
+var store = {
+  get: function (k, def) {
+    try { var v = window.localStorage.getItem(k); return v === null ? def : v } catch (e) { return memStore[k] !== undefined ? memStore[k] : def }
+  },
+  set: function (k, v) {
+    try { window.localStorage.setItem(k, v) } catch (e) { memStore[k] = v }
+  }
+}
+
+// ========== 菜品数据（测试用，后续接入后端后从服务端拉取）==========
+var MENU = [
+  { emoji: '🍚', id: 'dan-chaofan',      name: '蛋炒饭',         desc: '招牌主食，粒粒分明',     price: 20, category: '主食' },
+  { emoji: '🍅', id: 'xihongshi-jidan',  name: '西红柿炒鸡蛋',   desc: '国民下饭菜，汤汁拌饭一绝', price: 20, category: '主食' },
+  { emoji: '🫑', id: 'qingjiao-rousi',   name: '青椒肉丝',       desc: '脆嫩微辣，家常硬菜',     price: 20, category: '主食' },
+  { emoji: '🍜', id: 'dan-fangbianmian', name: '旦式现煮方便面', desc: '深夜限定，现点现煮',     price: 15, category: '主食' },
+  { emoji: '🥤', id: 'kele',             name: '无糖可乐',       desc: '冰镇，快乐不胖',         price: 5,  category: '饮料' },
+  { emoji: '🍑', id: 'yuanqisenlin',     name: '元气森林',       desc: '白桃味，气泡满满',       price: 5,  category: '饮料' },
+  { emoji: '🛁', id: 'dan-xitou',        name: '旦式洗头',       desc: '舒缓放松，专属VIP',      price: 30, category: '爱意服务' },
+  { emoji: '💆', id: 'dan-anmo',         name: '旦式按摩',       desc: '肩颈放松二十分钟',       price: 30, category: '爱意服务' },
+  { emoji: '🤗', id: 'dan-baobao',       name: '旦式抱抱',       desc: '拥抱一分钟，续抱半价',   price: 10, category: '爱意服务' },
+  { emoji: '😘', id: 'dan-qinqin',       name: '旦式亲亲',       desc: '终身会员价，仅限老板本人', price: 520, category: '爱意服务' }
+]
+
+// 桌号：优先从网址 ?table=A01 读取；没有就默认 A01（测试模式，方便直接打开就能点）
+var paramTable = ''
+try { paramTable = new URLSearchParams(location.search).get('table') || '' } catch (e) {}
+var tableNo = paramTable || '家'
+document.getElementById('tableTag').textContent = paramTable ? ('桌号：' + tableNo) : '桌号：家（默认）'
+
+var cart = {}   // { dishId: count }
+var currentCate = '全部'
+
+// ========== 渲染 ==========
+function render() {
+  // 分类
+  var cates = ['全部'].concat(MENU.map(function (d) { return d.category }).filter(function (v, i, a) { return a.indexOf(v) === i }))
+  document.getElementById('cateBar').innerHTML = cates.map(function (c) {
+    var ce = c === '全部' ? '🌟' : ({ '主食': '🍳', '饮料': '🥤', '爱意服务': '💝' }[c] || '')
+    return '<div class="cate-item ' + (c === currentCate ? 'active' : '') + '" onclick="setCate(\'' + c + '\')">' + (ce ? ce + ' ' : '') + c + '</div>'
+  }).join('')
+
+  // 菜品
+  var CAT_EMOJI = { '主食': '🍳', '饮料': '🥤', '爱意服务': '💝' }
+  var cats = currentCate === '全部' ? ['主食', '饮料', '爱意服务'] : [currentCate]
+  var html = ''
+  cats.forEach(function (cat) {
+    var list = MENU.filter(function (d) { return d.category === cat })
+    if (!list.length) return
+    html += '<div class="group-title">' + (CAT_EMOJI[cat] || '✨') + ' ' + cat + '</div>'
+    html += list.map(function (d) {
+      var count = cart[d.id] || 0
+      var right = count > 0
+        ? '<div class="stepper">' +
+            '<div class="step-btn" onclick="changeCount(\'' + d.id + '\',-1)">−</div>' +
+            '<div class="step-count">' + count + '</div>' +
+            '<div class="step-btn add" onclick="changeCount(\'' + d.id + '\',1)">＋</div>' +
+          '</div>'
+        : '<div class="add-btn" onclick="changeCount(\'' + d.id + '\',1)">＋ 加菜</div>'
+      return '<div class="dish-item">' +
+        '<div style="display:flex;align-items:center">' +
+          '<span class="dish-emoji">' + (d.emoji || '🍽️') + '</span>' +
+          '<div>' +
+          '<div class="dish-name">' + d.name + '</div>' +
+          '<div class="dish-desc">' + d.desc + '</div>' +
+          '<div class="price">¥' + d.price + '</div>' +
+        '</div>' + right + '</div>'
+    }).join('')
+  })
+  document.getElementById('dishList').innerHTML = html
+
+  // 底部栏
+  var count = 0
+  var total = 0
+  Object.keys(cart).forEach(function (k) {
+    count += cart[k]
+    var dish = MENU.filter(function (d) { return d.id === k })[0]
+    if (dish) total += dish.price * cart[k]
+  })
+  document.getElementById('cartBadge').style.display = count ? 'block' : 'none'
+  document.getElementById('cartBadge').textContent = count
+  document.getElementById('cartTotal').textContent = '¥' + total
+  document.getElementById('cartGo').disabled = !count
+
+  renderCartSheet()
+}
+
+function setCate(c) { currentCate = c; render() }
+
+function changeCount(id, delta) {
+  cart[id] = (cart[id] || 0) + delta
+  if (cart[id] <= 0) delete cart[id]
+  saveCart()
+  render()
+}
+
+function cartTotal() {
+  var t = 0
+  MENU.forEach(function (d) { t += (cart[d.id] || 0) * d.price })
+  return t
+}
+
+function saveCart() { store.set('dandan_cart', JSON.stringify(cart)) }
+function loadCart() {
+  try { cart = JSON.parse(store.get('dandan_cart', '{}')) || {} } catch (e) { cart = {} }
+}
+
+// ========== 购物车弹层 ==========
+function openCart() {
+  document.getElementById('mask').classList.add('open')
+  document.getElementById('cartSheet').classList.add('open')
+  renderCartSheet()
+}
+function closeCart() {
+  document.getElementById('mask').classList.remove('open')
+  document.getElementById('cartSheet').classList.remove('open')
+}
+function renderCartSheet() {
+  var rows = MENU.filter(function (d) { return cart[d.id] }).map(function (d) {
+    return '<div class="cart-row">' +
+      '<span>' + (d.emoji || '🍽️') + ' ' + d.name + ' <span class="price">¥' + d.price + '</span></span>' +
+      '<div class="stepper">' +
+        '<div class="step-btn" onclick="changeCount(\'' + d.id + '\',-1)">−</div>' +
+        '<div class="step-count">' + cart[d.id] + '</div>' +
+        '<div class="step-btn add" onclick="changeCount(\'' + d.id + '\',1)">＋</div>' +
+      '</div></div>'
+  }).join('')
+  document.getElementById('cartRows').innerHTML = rows || '<div class="empty">购物车空空的，肚子饿饿 (๑•́ ₃ •̀๑)</div>'
+  var n = 0
+  Object.keys(cart).forEach(function (k) { n += cart[k] })
+  document.getElementById('totalCount').textContent = '共 ' + n + ' 件'
+  document.getElementById('sheetTotal').textContent = '¥' + cartTotal()
+}
+
+// ========== 下单（测试模式：订单存手机本地，不经过服务端、不收钱）==========
+function submitOrder() {
+  if (!Object.keys(cart).length) return
+  var orders = []
+  try { orders = JSON.parse(store.get('dandan_orders', '[]')) || [] } catch (e) { orders = [] }
+  orders.unshift({
+    id: 'D' + new Date().getTime(),
+    tableNo: tableNo,
+    items: MENU.filter(function (d) { return cart[d.id] }).map(function (d) {
+      return { name: d.name, count: cart[d.id], subtotal: d.price * cart[d.id] }
+    }),
+    total: cartTotal(),
+    remark: document.getElementById('remarkInput').value.trim(),
+    time: new Date().toLocaleString('zh-CN', { hour12: false }),
+    status: '已下单'
+  })
+  store.set('dandan_orders', JSON.stringify(orders))
+  cart = {}
+  saveCart()
+  closeCart()
+  render()
+  showToast('下单成功！马上给你做呀 (๑´ㅂ`๑)')
+  document.getElementById('remarkInput').value = ''
+  switchView('orderView', document.querySelectorAll('.tab')[1])
+}
+
+function renderOrders() {
+  var orders = []
+  try { orders = JSON.parse(store.get('dandan_orders', '[]')) || [] } catch (e) { orders = [] }
+  if (!orders.length) {
+    document.getElementById('orderList').innerHTML = '<div class="empty">还没有订单，快去点第一单吧 ♡</div>'
+    return
+  }
+  document.getElementById('orderList').innerHTML = orders.map(function (o) {
+    var items = o.items.map(function (i) {
+      return '<div class="order-row"><span>' + i.name + ' × ' + i.count + '</span><span>¥' + i.subtotal + '</span></div>'
+    }).join('')
+    var remark = o.remark ? '<div class="order-row" style="color:#999">备注：' + o.remark + '</div>' : ''
+    return '<div class="order-card">' +
+      '<div class="order-head"><span>桌号 ' + o.tableNo + '</span><span class="status">' + o.status + '</span></div>' +
+      items + remark +
+      '<div class="order-foot"><span>' + o.time + '</span><span>合计 <span class="price">¥' + o.total + '</span></span></div>' +
+      '</div>'
+  }).join('')
+}
+
+// ========== 通用 ==========
+function switchView(id, tabEl) {
+  var views = document.querySelectorAll('.view')
+  for (var i = 0; i < views.length; i++) views[i].classList.remove('active')
+  document.getElementById(id).classList.add('active')
+  var tabs = document.querySelectorAll('.tab')
+  for (var j = 0; j < tabs.length; j++) tabs[j].classList.remove('active')
+  tabEl.classList.add('active')
+  if (id === 'orderView') renderOrders()
+}
+function showToast(msg) {
+  var t = document.getElementById('toast')
+  t.textContent = msg
+  t.style.display = 'block'
+  setTimeout(function () { t.style.display = 'none' }, 1500)
+}
+
+loadCart()
+render()
+</script>
+</body>
+</html>
